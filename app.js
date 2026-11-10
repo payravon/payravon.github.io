@@ -30,7 +30,7 @@ const client = configured && window.supabase ? window.supabase.createClient(conf
   auth: { persistSession: true, autoRefreshToken: true }
 }) : null;
 let current=null, activeTab='home', busy=false;
-let data={universities:[],students:[],lessons:[],attendance:[],announcements:[],warnings:[],points:[]};
+let data={universities:[],students:[],lessons:[],attendance:[],announcements:[],warnings:[],points:[],registrations:[]};
 function role(){return current?.role||'student'}
 function isStaff(){return role()==='admin'||role()==='super_admin'}
 function roleText(r){return ({student:'Донишҷӯ',admin:'Admin',super_admin:'Super Admin'})[r] || r}
@@ -46,7 +46,9 @@ async function q(table,options={}){
   const rows=[];const pageSize=800;
   for(let page=0;page<40;page++){
     let request=client.from(table).select(options.select||'*').range(page*pageSize,page*pageSize+pageSize-1);
+    if(options.filter)request=request.eq(...options.filter);
     if(options.order)request=request.order(options.order,{ascending:options.ascending!==false});
+    if(options.secondaryOrder)request=request.order(options.secondaryOrder);
     const {data:part,error}=await request;
     if(error)throw error;
     rows.push(...(part||[]));
@@ -62,9 +64,13 @@ async function loadData(){
   if(isStaff())jobs.push(q('profiles',{order:'created_at',ascending:false}));
   else jobs.push(Promise.resolve([current]));
   jobs.push(q('points_ledger',{order:'created_at',ascending:false}));
-  const [lessons,attendance,announcements,students,points]=await Promise.all(jobs);
+  jobs.push(q('event_points_awards',{select:'student_id,points,reason,created_at',order:'created_at',ascending:false}));
+  jobs.push(isStaff()?Promise.resolve([]):q('announcement_registrations',{order:'announcement_id'}));
+  const [lessons,attendance,announcements,students,points,eventPoints,registrations]=await Promise.all(jobs);
   data.lessons=lessons;data.attendance=attendance;data.announcements=announcements;
-  data.students=students;data.points=points;
+  data.students=students;
+  data.points=[...points,...eventPoints].sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
+  data.registrations=registrations;
   if(isStaff()){
     const {data:warnings,error}=await client.rpc('absence_warnings');
     if(error){
@@ -118,14 +124,50 @@ function renderCountdown(seconds){
  const days=Math.floor(seconds/86400),hours=Math.floor((seconds%86400)/3600),mins=Math.floor((seconds%3600)/60),secs=seconds%60;
  return seconds===0?'Вақт фаро расид':`${days} рӯз · ${String(hours).padStart(2,'0')} соат · ${String(mins).padStart(2,'0')} дақ · ${String(secs).padStart(2,'0')} сония`;
 }
+function registrationClosed(a){
+ return a.is_active===false || (a.countdown_to && new Date(a.countdown_to).getTime()<=Date.now());
+}
+function registrationEnabled(a){return a.registration_mode==='all'||a.registration_mode==='limited'}
+function registrationFull(a){return a.registration_mode==='limited'&&a.registered_count>=a.participant_limit}
+function registrationCount(a){
+ return a.registration_mode==='limited'
+  ? `${Number(a.registered_count)} аз ${Number(a.participant_limit)} ҷой`
+  : `Барои ҳама · ${Number(a.registered_count)} сабт`;
+}
+function registrationStatus(a){
+ if(registrationFull(a))return '<span class="status no">Ҷойҳо пур шуданд</span>';
+ if(registrationClosed(a))return '<span class="status no">Сабти ном баста аст</span>';
+ return '';
+}
+function registrationInfo(a){
+ if(!registrationEnabled(a))return '';
+ const joined=data.registrations.some(r=>String(r.announcement_id)===String(a.id));
+ const status=registrationStatus(a);
+ let action=joined?'<span class="status ok">Сабт шудед</span>':status;
+ if(isStaff())action=`<span data-registration-status>${status}</span>
+  <button type="button" class="btn secondary" data-event-roster="${esc(a.id)}" aria-expanded="false">Рӯйхати иштирокчиён</button>
+  <div class="event-roster" hidden>
+   <button type="button" class="btn primary" data-export-event="${esc(a.id)}">Боргирии CSV</button>
+   <div data-roster-content></div>
+  </div>`;
+ else if(!action)action=`<button type="button" class="btn primary" data-join-event="${esc(a.id)}">Ман иштирок мекунам</button>`;
+ return `<div class="announcement-actions"><strong data-event-count="${esc(a.id)}">${registrationCount(a)}</strong> ${action}</div>`;
+}
 function renderUrgentBanner(){
  const container=$('urgentBanner');if(!container||!current)return;
  const now=Date.now();
  const featured=data.announcements.filter(a=>a.is_active!==false&&a.is_urgent&&a.is_pinned&&(!a.countdown_to||new Date(a.countdown_to).getTime()>now))
   .sort((a,b)=>Number(b.id)-Number(a.id))[0];
- if(!featured){container.innerHTML='';container.hidden=true;return}
+ if(!featured){
+  const latest=!isStaff()&&data.announcements.find(a=>registrationEnabled(a)&&!registrationClosed(a));
+  container.hidden=!latest;
+  container.innerHTML=latest?`<div class="panel-card"><strong>📢 ${esc(latest.title)}</strong> <button type="button" class="btn secondary" id="openEventAnnouncements">Дидани эълонҳо</button></div>`:'';
+  if(latest)$('openEventAnnouncements').onclick=()=>renderTabs('announcements');
+  return;
+ }
  container.hidden=false;
- container.innerHTML=`<div class="urgent-banner"><div class="urgent-head">🔥 ХАБАРИ ФАВРӢ · РӮЗҲОИ НАЗДИК</div><strong class="urgent-title">${esc(featured.title)}</strong><p>${esc(featured.body)}</p>${featured.bonus_points?`<span class="urgent-bonus">⭐ ${Number(featured.bonus_points)} хол барои иштирок</span>`:''}${featured.countdown_to?`<div class="urgent-clock" data-end="${esc(featured.countdown_to)}" aria-live="off">⏳ ${renderCountdown(secondsLeft(featured.countdown_to))}</div>`:''}<span class="urgent-date">${featured.countdown_to?'Санаи чорабинӣ: '+dateTime(featured.countdown_to):'Эълони муҳим'}</span></div>`;
+ container.innerHTML=`<div class="urgent-banner"><div class="urgent-head">🔥 ХАБАРИ ФАВРӢ · РӮЗҲОИ НАЗДИК</div><strong class="urgent-title">${esc(featured.title)}</strong><p>${esc(featured.body)}</p>${featured.bonus_points?`<span class="urgent-bonus">⭐ ${Number(featured.bonus_points)} хол барои иштирок</span>`:''}${featured.countdown_to?`<div class="urgent-clock" data-end="${esc(featured.countdown_to)}" aria-live="off">⏳ ${renderCountdown(secondsLeft(featured.countdown_to))}</div>`:''}<span class="urgent-date">${featured.countdown_to?'Санаи чорабинӣ: '+dateTime(featured.countdown_to):'Эълони муҳим'}</span>${registrationEnabled(featured)&&!isStaff()?' <button type="button" class="btn secondary" id="openEventAnnouncements">Дидани эълонҳо</button>':''}</div>`;
+ if($('openEventAnnouncements'))$('openEventAnnouncements').onclick=()=>renderTabs('announcements');
 }
 
 function renderTabs(tab='home'){
@@ -198,7 +240,7 @@ function qrPanel(){
 }
 function scanPanel(){
  if(role()!=='student')return;
- panel(`<div class="panel-card scan-area"><h3>Скан кардани QR-коди дарс</h3><p class="muted">Барои камера HTTPS ё localhost лозим аст. QR танҳо 10 дақиқа кор мекунад.</p><div id="reader"></div><div id="scanResult" class="notice">QR ҳоло скан нашудааст.</div><button class="btn secondary" id="startScan">Оғози скан</button> <button class="btn ghost" id="stopScan">Қатъи камера</button></div>`);
+ panel(`<div class="panel-card scan-area"><h3>Скан кардани QR-коди дарс ё чорабинӣ</h3><p class="muted">Барои камера HTTPS ё localhost лозим аст. QR танҳо 10 дақиқа кор мекунад.</p><div id="reader"></div><div id="scanResult" class="notice">QR ҳоло скан нашудааст.</div><button class="btn secondary" id="startScan">Оғози скан</button> <button class="btn ghost" id="stopScan">Қатъи камера</button></div>`);
  let scanner=null,handling=false;
  $('startScan').onclick=async()=>{
   if(scanner)return;
@@ -209,13 +251,20 @@ function scanPanel(){
     if(handling)return;handling=true;
     try{
      const qr=JSON.parse(decoded);
-     if(!Number.isInteger(qr.lesson)||typeof qr.token!=='string')throw Error('QR-и нодуруст.');
+     const eventCode=qr?.type==='event-points';
+     if(typeof qr?.token!=='string'||(!eventCode&&!Number.isInteger(qr.lesson)))throw Error('QR-и нодуруст.');
      if(scanner){await scanner.stop();scanner=null}
-     const {error}=await client.rpc('mark_attendance',{p_lesson:qr.lesson,p_token:qr.token});
-     if(error)throw error;
-     $('scanResult').textContent=`Иштироки шумо барои дарси ${qr.lesson} сабт шуд. +3 хол!`;
-     await loadData();toast('Иштирок дар базаи маълумот сабт шуд.');
-    }catch(e){$('scanResult').textContent=e.message||'Скан хато шуд.';fail(e)}finally{handling=false}
+     const result=eventCode
+      ? await client.rpc('claim_event_points_qr',{p_token:qr.token})
+      : await client.rpc('mark_attendance',{p_lesson:qr.lesson,p_token:qr.token});
+     if(result.error)throw result.error;
+     const message=eventCode
+      ? (result.data.already_awarded?'Холи ин чорабинӣ қаблан сабт шудааст.':`+${result.data.points} хол барои чорабинӣ!`)
+      : `Иштироки шумо барои дарси ${qr.lesson} сабт шуд. +3 хол!`;
+     if($('scanResult'))$('scanResult').textContent=message;
+     toast(message);
+     await loadData();
+    }catch(e){if($('scanResult'))$('scanResult').textContent=e.message||'Скан хато шуд.';fail(e)}finally{handling=false}
    },()=>{});
   }catch(e){scanner=null;fail(e)}
  };
@@ -225,12 +274,97 @@ function attendance(){
  const rows=data.attendance;
  panel(`<div class="panel-card"><div class="panel-title"><h3>${isStaff()?'Иштироки донишҷӯён':'Таърихи иштироки ман'}</h3><span class="status ok">${rows.length} сабт</span></div>${rows.length?`<div class="table-wrap"><table><thead><tr><th>Ҷой</th><th>Донишҷӯ</th><th>Дарс</th><th>Сана ва вақт</th></tr></thead><tbody>${rows.map(a=>`<tr class="student-row ${rankTheme(studentRank(a.student_id))}"><td>${rankBadge(studentRank(a.student_id))}</td><td>${studentNameHtml(a.student_id,current?.full_name||'—')}</td><td>${a.lesson_id} — ${esc(lessonName(a.lesson_id))}</td><td>${dateTime(a.attended_at)}</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">Ҳоло сабти иштирок нест.</div>'}</div>`);
 }
+function announcementCards(list,staff){
+ return list.map(a=>`<div class="mini-card announcement-card ${a.is_urgent?'announcement-important':''}"><div class="announcement-title"><strong>${a.is_urgent?'🔥 ':''}${esc(a.title)}</strong>${a.is_pinned&&a.is_active!==false?'<span class="status ok">📌 Мустаҳкам</span>':''}${a.is_active===false?'<span class="status no">Хомӯш</span>':''}</div><p>${esc(a.body)}</p>${a.bonus_points?`<p>⭐ ${Number(a.bonus_points)} хол барои иштирок</p>`:''}${a.countdown_to?`<p class="muted">⏳ ${dateTime(a.countdown_to)}</p>`:''}<small>${esc(a.audience_university_id?universityName(a.audience_university_id):'Ҳама')} · ${dateTime(a.created_at)}</small>${registrationInfo(a)}${staff&&(a.is_urgent||registrationEnabled(a))?`<div class="announcement-actions">${a.is_urgent?`<button class="btn secondary" data-ann-action="pin" data-ann-id="${Number(a.id)}">${a.is_pinned?'Кушодани закреп':'Закрепить'}</button>`:''}<button class="btn danger" data-ann-action="toggle" data-ann-id="${Number(a.id)}">${a.is_active===false?'Фаъол кардан':'Хомӯш кардан'}</button></div>`:''}</div>`).join('');
+}
+function announcementList(){
+ const list=isStaff()?data.announcements:data.announcements.filter(a=>a.is_active!==false);
+ return list.length?announcementCards(list,isStaff()):'<div class="empty">Эълон нест.</div>';
+}
+const rosterLoads=new WeakMap();
+const rosterDateTime=new Intl.DateTimeFormat('ru-RU',{
+ timeZone:'Asia/Dushanbe',dateStyle:'short',timeStyle:'medium'
+});
+function refreshEventRoster(target,id){
+ if(rosterLoads.has(target))return rosterLoads.get(target);
+ const content=target.querySelector('[data-roster-content]');
+ const button=target.querySelector('[data-export-event]');
+ button.disabled=true;
+ if(!content.textContent)content.textContent='Рӯйхат бор мешавад…';
+ const load=q('announcement_registrations',{
+  select:'student_id,created_at,profiles(full_name)',
+  order:'created_at',secondaryOrder:'student_id',filter:['announcement_id',id]
+ }).then(registrations=>{
+  const rows=registrations.map((row,index)=>[
+   index+1,row.profiles?.full_name||'Донишҷӯ',rosterDateTime.format(new Date(row.created_at))
+  ]);
+  content.innerHTML=`<p><strong>Сабтшудагон: ${rows.length} нафар</strong></p>`+(rows.length
+   ? `<ol>${rows.map(([,name,time])=>`<li>${esc(name)} · ${esc(time)}</li>`).join('')}</ol>`
+   : '<p>Ҳоло касе сабт нашудааст.</p>');
+  return rows;
+ }).catch(error=>{
+  content.textContent='Рӯйхат бор нашуд. Аз нав кӯшиш кунед.';
+  throw error;
+ }).finally(()=>{
+  rosterLoads.delete(target);
+  button.disabled=false;
+ });
+ rosterLoads.set(target,load);
+ return load;
+}
 function announcements(){
  const staff=isStaff();
- const list=data.announcements.slice();
- const announceRows=list.map(a=>`<div class="mini-card announcement-card ${a.is_urgent?'announcement-important':''}"><div class="announcement-title"><strong>${a.is_urgent?'🔥 ':''}${esc(a.title)}</strong>${a.is_pinned&&a.is_active!==false?'<span class="status ok">📌 Мустаҳкам</span>':''}${a.is_active===false?'<span class="status no">Хомӯш</span>':''}</div><p>${esc(a.body)}</p>${a.bonus_points?`<p>⭐ ${Number(a.bonus_points)} хол (эълон, на холи автоматӣ)</p>`:''}${a.countdown_to?`<p class="muted">⏳ ${dateTime(a.countdown_to)}</p>`:''}<small>${esc(a.audience_university_id?universityName(a.audience_university_id):'Ҳама')} · ${dateTime(a.created_at)}</small>${staff&&a.is_urgent?`<div class="announcement-actions"><button class="btn secondary" data-ann-action="pin" data-ann-id="${Number(a.id)}">${a.is_pinned?'Кушодани закреп':'Закрепить'}</button><button class="btn danger" data-ann-action="toggle" data-ann-id="${Number(a.id)}">${a.is_active===false?'Фаъол кардан':'Хомӯш кардан'}</button></div>`:''}</div>`).join('');
- panel(`${staff?`<div class="panel-card"><h3>📢 Нашри эълон / хабари фаврӣ</h3><form id="announceForm" class="form-grid"><label class="full">Сарлавҳа<input name="title" minlength="2" maxlength="200" required placeholder="Масалан: РӮЗҲОИ НАЗДИК — ШАНБЕГӢ"></label><label class="full">Матни эълон<textarea name="body" rows="3" minlength="2" maxlength="5000" required></textarea></label><label>Аудитория<select name="audience"><option value="">Ҳама</option>${data.universities.map(u=>`<option value="${u.id}">${esc(u.name)}</option>`).join('')}</select></label><label>Сана ва вақти чорабинӣ<input type="datetime-local" name="countdown_to"></label><label>Хол барои чорабинӣ (ихтиёрӣ)<input type="number" name="bonus_points" min="0" max="100" value="0"></label><label class="check-label"><input type="checkbox" name="is_urgent" id="urgentCheck"> 🔥 Хабари фаврӣ</label><label class="check-label"><input type="checkbox" name="is_pinned" id="pinCheck"> 📌 Дар болои ҳама панелҳо нишон додан</label><button class="btn primary full">Нашр кардан</button></form><p class="hint">Барои ҳисобкунаки вақт, сана ва соатро муайян кунед. Холи эълон худкор дода намешавад; барои додани хол аз бахши «Холҳо» истифода баред.</p></div>`:''}<div class="panel-card"><h3>Эълонҳо</h3>${list.length?announceRows:'<div class="empty">Эълон нест.</div>'}</div>`);
+ panel(`${staff?`<div class="panel-card"><h3>📢 Нашри эълон / хабари фаврӣ</h3><form id="announceForm" class="form-grid"><label class="full">Сарлавҳа<input name="title" minlength="2" maxlength="200" required placeholder="Масалан: РӮЗҲОИ НАЗДИК — ШАНБЕГӢ"></label><label class="full">Матни эълон<textarea name="body" rows="3" minlength="2" maxlength="5000" required></textarea></label><label>Сабти иштирок<select name="registration_mode"><option value="none">Танҳо эълон</option><option value="limited">Шумораи муайян</option><option value="all">Ҳамаи донишҷӯён</option></select></label><label id="participantLimitLabel" hidden>Шумораи ҷойҳо<input name="participant_limit" type="number" min="1" max="2147483647" step="1" placeholder="100" disabled></label><label>Аудитория<select name="audience"><option value="">Ҳама</option>${data.universities.map(u=>`<option value="${u.id}">${esc(u.name)}</option>`).join('')}</select></label><label>Сана ва вақти чорабинӣ<input type="datetime-local" name="countdown_to"></label><label>Хол барои чорабинӣ (ихтиёрӣ)<input type="number" name="bonus_points" min="0" max="100" value="0"></label><label class="check-label"><input type="checkbox" name="is_urgent" id="urgentCheck"> 🔥 Хабари фаврӣ</label><label class="check-label"><input type="checkbox" name="is_pinned" id="pinCheck"> 📌 Дар болои ҳама панелҳо нишон додан</label><button class="btn primary full">Нашр кардан</button></form><p class="hint">Барои ҳисобкунаки вақт, сана ва соатро муайян кунед. Сабти иштирок ба ҳамаи донишҷӯёни тасдиқшуда дастрас аст. Барои додани хол аз бахши «Холҳо» QR созед.</p></div>`:''}<div class="panel-card"><h3>Эълонҳо</h3><div id="announcementList">${announcementList()}</div></div>`);
+ $('announcementList').onclick=async e=>{
+  const join=e.target.closest('[data-join-event]');
+  const roster=e.target.closest('[data-event-roster]');
+  if(join){
+   const list=$('announcementList');
+   list.dataset.joining='true';
+   join.disabled=true;
+   try{
+    const {data:result,error}=await client.rpc('join_payravon_event',{p_announcement:Number(join.dataset.joinEvent)});
+    if(error)throw error;
+    const [rows,registrations]=await Promise.all([q('announcements',{order:'id',ascending:false}),q('announcement_registrations',{order:'announcement_id'})]);
+    data.announcements=rows;
+    data.registrations=registrations;
+    if(list.isConnected)list.innerHTML=announcementList();
+    toast(({joined:'Иштироки шумо сабт шуд.',already:'Шумо аллакай сабт шудаед.',full:'Ҷойҳо пур шуданд.',closed:'Сабти ном баста аст.'})[result]);
+   }catch(error){fail(error)}finally{delete list.dataset.joining;join.disabled=false}
+  }
+  if(roster&&staff){
+   const target=roster.nextElementSibling;
+   target.hidden=!target.hidden;
+   roster.setAttribute('aria-expanded',String(!target.hidden));
+   if(!target.hidden){
+    try{await refreshEventRoster(target,roster.dataset.eventRoster)}catch(error){fail(error)}
+   }
+  }
+  const download=e.target.closest('[data-export-event]');
+  if(download&&staff){
+   const id=download.dataset.exportEvent;
+   try{
+    const rows=await refreshEventRoster(download.closest('.event-roster'),id);
+    if(!current||!isStaff()||!download.isConnected||$('dashboard').classList.contains('hidden'))return;
+    if(!rows.length){toast('Ҳоло касе сабт нашудааст.');return}
+    const title=data.announcements.find(a=>String(a.id)===id)?.title||'чорабинӣ';
+    const safeTitle=title.replace(/[^\p{L}\p{M}\p{N}]+/gu,'-').slice(0,70);
+    downloadCsv(`ishtirok-${id}-${safeTitle}.csv`,[
+     ['№','Ному насаб','Сана ва вақти сабт (Душанбе)'],...rows
+    ]);
+   }catch(error){fail(error)}
+  }
+ };
  if(staff){
+  const fields=$('announceForm').elements;
+  fields.registration_mode.onchange=()=>{
+   const limited=fields.registration_mode.value==='limited';
+   $('participantLimitLabel').hidden=!limited;
+   fields.participant_limit.disabled=!limited;
+   fields.participant_limit.required=limited;
+   fields.audience.disabled=fields.registration_mode.value!=='none';
+   if(fields.audience.disabled)fields.audience.value='';
+  };
   $('pinCheck').onchange=e=>{if(e.target.checked)$('urgentCheck').checked=true};
   $('announceForm').onsubmit=async e=>{
    e.preventDefault();const f=new FormData(e.target),when=String(f.get('countdown_to')||'');
@@ -238,7 +372,11 @@ function announcements(){
    if(urgent&&(!when||!Number.isFinite(new Date(when).getTime())||new Date(when).getTime()<=Date.now())){toast('Барои хабари фаврӣ сана ва вақти ояндаро интихоб кунед.');return}
    const points=Number(f.get('bonus_points')||0);
    if(!Number.isInteger(points)||points<0||points>100){toast('Хол аз 0 то 100 бошад.');return}
-   const payload={title:String(f.get('title')).trim(),body:String(f.get('body')).trim(),audience_university_id:f.get('audience')?Number(f.get('audience')):null,created_by:current.id,is_urgent:urgent,is_pinned:f.has('is_pinned'),countdown_to:when?new Date(when).toISOString():null,bonus_points:points,is_active:true};
+   const mode=f.get('registration_mode');
+   const limit=mode==='limited'?Number(f.get('participant_limit')):null;
+   if(mode==='limited'&&(!Number.isInteger(limit)||limit<1||limit>2147483647)){toast('Шумораи дурусти ҷойҳоро ворид кунед.');return}
+   if(mode!=='none'&&when&&new Date(when).getTime()<=Date.now()){toast('Санаи чорабинӣ бояд дар оянда бошад.');return}
+   const payload={registration_mode:mode,participant_limit:limit,title:String(f.get('title')).trim(),body:String(f.get('body')).trim(),audience_university_id:f.get('audience')?Number(f.get('audience')):null,created_by:current.id,is_urgent:urgent,is_pinned:f.has('is_pinned'),countdown_to:when?new Date(when).toISOString():null,bonus_points:points,is_active:true};
    try{updateBusy(e.target,true);const {error}=await client.from('announcements').insert(payload);if(error)throw error;await refresh('announcements');toast('Эълон нашр шуд.')}catch(ex){fail(ex)}finally{updateBusy(e.target,false)}
   };
   $('panel').querySelectorAll('[data-ann-action]').forEach(btn=>btn.onclick=async()=>{
@@ -259,14 +397,26 @@ function getReport(){
   return {id:s.id,name:s.full_name,university:universityName(s.university_id),course:s.course,present:scans,absent,total:eligible.length,percent:eligible.length?(attended/eligible.length*100).toFixed(1):'—',points:studentPoints(s.id)};
  });
 }
+function downloadCsv(filename,cells){
+ const csv='\uFEFF'+cells.map(row=>row.map(value=>{
+  let cell=String(value??'');
+  if(/^\s*[=+@-]|^[\t\r\n]/.test(cell))cell="'"+cell;
+  return '"'+cell.replaceAll('"','""')+'"';
+ }).join(';')).join('\r\n');
+ const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
+ const link=document.createElement('a');
+ link.href=url;
+ link.download=filename;
+ link.click();
+ setTimeout(()=>URL.revokeObjectURL(url),1500);
+}
 function reports(){
  if(!isStaff())return;
  const rows=getReport().sort((a,b)=>studentPoints(b.id)-studentPoints(a.id)||String(a.name).localeCompare(String(b.name),'tg'));
  panel(`<div class="panel-card"><div class="panel-title"><h3>Ҳисоботи курс</h3><button class="btn primary" id="csv">Содироти CSV</button></div><p class="muted">Ҳозир — ҳар QR-и бомуваффақият сабтшуда (ҳатто дарси фаъол). Ғоибӣ ва фоиз танҳо аз дарсҳои анҷомёфтаи баъди тасдиқ ҳисоб мешаванд. Ҳангоми кушода будани ҳисобот, маълумот ҳар 10 сония нав мешавад.</p>${rows.length?`<div class="table-wrap"><table><thead><tr><th>Ҷой</th><th>Донишҷӯ</th><th>Донишгоҳ</th><th>Курс</th><th>Дарсҳои ҳисобшаванда</th><th>Ҳозир (QR)</th><th>Ғоиб</th><th>Иштирок</th><th>Хол</th></tr></thead><tbody>${rows.map(r=>`<tr class="student-row ${rankTheme(studentRank(r.id))}"><td>${rankBadge(studentRank(r.id))}</td><td>${studentNameHtml(r.id,r.name)}</td><td>${esc(r.university)}</td><td>${esc(r.course)}</td><td>${r.total}</td><td>${r.present}</td><td>${r.absent}</td><td>${r.percent==='—'?'—':r.percent+'%'}</td><td>${r.points}</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">Маълумоти кофӣ нест.</div>'}</div>`);
  $('csv').onclick=()=>{
   const cells=[['Ҷой','Ному насаб','Донишгоҳ','Курс','Дарсҳои ҳисобшаванда','Ҳозир','Ғоиб','Фоизи иштирок','Хол'],...rows.map(r=>[studentRank(r.id),r.name,r.university,r.course,r.total,r.present,r.absent,r.percent,r.points])];
-  const csv='\uFEFF'+cells.map(r=>r.map(v=>{let x=String(v??'');if(/^[=+@-]/.test(x))x="'"+x;return '"'+x.replaceAll('"','""')+'"';}).join(';')).join('\r\n');
-  const link=document.createElement('a');link.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));link.download='hisoboti-payravon.csv';link.click();setTimeout(()=>URL.revokeObjectURL(link.href),1500);
+  downloadCsv('hisoboti-payravon.csv',cells);
  };
 }
 function settings(){
@@ -290,10 +440,70 @@ function settings(){
   try{b.disabled=true;const {error}=await client.rpc('set_staff_role',{p_user:person.id,p_role:'student'});if(error)throw error;await refresh('settings');toast('Ҳуқуқи Admin бекор шуд.')}catch(e){fail(e);b.disabled=false}
  });
 }
+function eventPointsPanel(){
+ const options=data.announcements.map(a=>`<option value="${esc(a.id)}">${esc(a.title)} · ${esc(dateTime(a.created_at))}</option>`).join('');
+ return `<div class="panel-card"><h3>QR-код барои холҳои чорабинӣ</h3>
+  <form id="eventPointsForm" class="form-grid">
+   <label>Эълон<select name="announcement"><option value="">Чорабинии бе эълон</option>${options}</select></label>
+   <label>Хол (1–100)<input type="number" name="points" min="1" max="100" value="7" required></label>
+   <label class="full" id="eventReasonLabel">Номи чорабинӣ<input name="reason" minlength="2" maxlength="300" required></label>
+   <button class="btn primary full">Сохтани QR-код</button>
+  </form>
+  <p class="hint">QR-код 10 дақиқа эътибор дорад. Донишҷӯ онро аз бахши «Скан кардани QR» мехонад. Барои чорабинии бе эълон ба ҳама донишҷӯёни тасдиқшудае, ки QR-ро скан мекунанд, хол дода мешавад.</p>
+  <div id="eventPointsOutput" hidden><p id="eventPointsMeta" role="status"></p><div id="eventPointsCode"></div></div>
+ </div>`;
+}
+function bindEventPointsForm(){
+ const form=$('eventPointsForm');
+ form.elements.announcement.onchange=()=>{
+  const event=data.announcements.find(a=>String(a.id)===form.elements.announcement.value);
+  form.elements.reason.disabled=Boolean(event);
+  form.elements.reason.required=!event;
+  $('eventReasonLabel').hidden=Boolean(event);
+  if(event)form.elements.points.value=event.bonus_points||7;
+ };
+ form.onsubmit=async e=>{
+  e.preventDefault();
+  if(typeof QRCode==='undefined'){toast('Китобхонаи QR бор нашуд. Интернетро санҷед.');return}
+  const fields=new FormData(form);
+  try{
+   updateBusy(form,true);
+   const {data:qr,error}=await client.rpc('make_event_points_qr',{
+    p_announcement:fields.get('announcement')?Number(fields.get('announcement')):null,
+    p_points:Number(fields.get('points')),
+    p_reason:fields.get('reason')?.trim()||null
+   });
+   if(error)throw error;
+   if(!form.isConnected)return;
+   $('eventPointsCode').replaceChildren();
+   new QRCode($('eventPointsCode'),{
+    text:JSON.stringify({type:'event-points',token:qr.token}),
+    width:240,height:240,correctLevel:QRCode.CorrectLevel.M
+   });
+   $('eventPointsMeta').textContent=`+${qr.points} хол · Эътибор то ${dateTime(qr.expires_at)}`;
+   $('eventPointsOutput').hidden=false;
+  }catch(error){fail(error)}finally{updateBusy(form,false)}
+ };
+}
+function renderPointsSummary(){
+ const students=rankedStudents();
+ const summary=$('pointsSummary');
+ summary.innerHTML=`<div class="panel-card"><div class="panel-title"><h3>Ҷамъи холҳои донишҷӯён</h3><button class="btn secondary" type="button" id="refreshPoints">Нав кардани холҳо</button></div><div class="table-wrap"><table><thead><tr><th>Ҷой</th><th>Донишҷӯ</th><th>Хол</th></tr></thead><tbody>${students.map(s=>`<tr class="student-row ${rankTheme(studentRank(s.id))}"><td>${rankBadge(studentRank(s.id))}</td><td>${studentNameHtml(s.id,s.full_name)}</td><td>${studentPoints(s.id)}</td></tr>`).join('')}</tbody></table></div></div><div class="panel-card"><h3>Таърихи холҳо</h3><div class="table-wrap"><table><thead><tr><th>Донишҷӯ</th><th>Хол</th><th>Сабаб</th><th>Сана</th></tr></thead><tbody>${data.points.map(p=>`<tr><td>${studentNameHtml(p.student_id)}</td><td>+${Number(p.points)}</td><td>${esc(p.reason)}</td><td>${dateTime(p.created_at)}</td></tr>`).join('')}</tbody></table></div></div>`;
+ $('refreshPoints').onclick=async e=>{
+  const button=e.currentTarget;
+  button.disabled=true;
+  try{
+   await loadData();
+   if(summary.isConnected)renderPointsSummary();
+  }catch(error){fail(error)}finally{button.disabled=false}
+ };
+}
 function pointsPage(){
  if(!isStaff())return;
  const students=rankedStudents();
- panel(`<div class="panel-card"><h3>Додани хол барои чорабинӣ ё ҷамъомад</h3><p class="muted">Ҳар QR-и нав барои як дарс худкор 3 хол медиҳад. Барои кори иловагӣ метавонед хол илова кунед; сабаб ва номи диҳанда сабт мешаванд.</p>${students.length?`<form id="pointsForm" class="form-grid"><label>Донишҷӯ<select name="student" required>${students.map(s=>`<option value="${esc(s.id)}">${esc(s.full_name)}</option>`).join('')}</select></label><label>Хол (1–100)<input type="number" name="points" min="1" max="100" value="3" required></label><label class="full">Сабаби додани хол<input name="reason" minlength="5" maxlength="300" required placeholder="Масалан: иштирок дар чорабинӣ"></label><button class="btn primary full">Хол илова кардан</button></form>`:'<p>Донишҷӯи тасдиқшуда нест.</p>'}</div><div class="panel-card"><h3>Ҷамъи холҳои донишҷӯён</h3><div class="table-wrap"><table><thead><tr><th>Ҷой</th><th>Донишҷӯ</th><th>Хол</th></tr></thead><tbody>${students.map(s=>`<tr class="student-row ${rankTheme(studentRank(s.id))}"><td>${rankBadge(studentRank(s.id))}</td><td>${studentNameHtml(s.id,s.full_name)}</td><td>${studentPoints(s.id)}</td></tr>`).join('')}</tbody></table></div></div><div class="panel-card"><h3>Таърихи холҳо</h3><div class="table-wrap"><table><thead><tr><th>Донишҷӯ</th><th>Хол</th><th>Сабаб</th><th>Сана</th></tr></thead><tbody>${data.points.map(p=>`<tr><td>${studentNameHtml(p.student_id)}</td><td>+${Number(p.points)}</td><td>${esc(p.reason)}</td><td>${dateTime(p.created_at)}</td></tr>`).join('')}</tbody></table></div></div>`);
+ panel(`${eventPointsPanel()}<div class="panel-card"><h3>Додани хол барои чорабинӣ ё ҷамъомад</h3><p class="muted">Ҳар QR-и нав барои як дарс худкор 3 хол медиҳад. Барои кори иловагӣ метавонед хол илова кунед; сабаб ва номи диҳанда сабт мешаванд.</p>${students.length?`<form id="pointsForm" class="form-grid"><label>Донишҷӯ<select name="student" required>${students.map(s=>`<option value="${esc(s.id)}">${esc(s.full_name)}</option>`).join('')}</select></label><label>Хол (1–100)<input type="number" name="points" min="1" max="100" value="3" required></label><label class="full">Сабаби додани хол<input name="reason" minlength="5" maxlength="300" required placeholder="Масалан: иштирок дар чорабинӣ"></label><button class="btn primary full">Хол илова кардан</button></form>`:'<p>Донишҷӯи тасдиқшуда нест.</p>'}</div><div id="pointsSummary"></div>`);
+ bindEventPointsForm();
+ renderPointsSummary();
  if(students.length)$('pointsForm').onsubmit=async e=>{
   e.preventDefault();const f=new FormData(e.target),v=Number(f.get('points'));
   if(!Number.isInteger(v)||v<1||v>100){toast('Хол аз 1 то 100 бошад.');return}
@@ -368,5 +578,30 @@ setInterval(()=>{
 // Receive new pinned announcements from other logged-in accounts.
 setInterval(async()=>{
  if(!client||!current||document.hidden||$('dashboard').classList.contains('hidden'))return;
- try{const rows=await q('announcements',{order:'id',ascending:false});data.announcements=rows;renderUrgentBanner()}catch(error){console.warn('Announcement polling failed',error)}
+ try{
+  const profile=current.id;
+  const rows=await q('announcements',{order:'id',ascending:false});
+  if(current?.id!==profile)return;
+  const list=$('announcementList');
+  if(list?.dataset.joining)return;
+  const changed=JSON.stringify(rows)!==JSON.stringify(data.announcements);
+  data.announcements=rows;
+  renderUrgentBanner();
+  if(!list)return;
+  if(!isStaff()){
+   if(changed||rows.some(a=>a.countdown_to&&registrationEnabled(a)))list.innerHTML=announcementList();
+   return;
+  }
+  const events=new Map(rows.map(event=>[String(event.id),event]));
+  list.querySelectorAll('[data-event-count]').forEach(count=>{
+   const event=events.get(count.dataset.eventCount);
+   if(!event)return;
+   count.textContent=registrationCount(event);
+   count.nextElementSibling.innerHTML=registrationStatus(event);
+  });
+  const rosters=list.querySelectorAll('.event-roster:not([hidden])');
+  await Promise.allSettled(Array.from(rosters,target=>refreshEventRoster(
+   target,target.querySelector('[data-export-event]').dataset.exportEvent
+  )));
+ }catch(error){console.warn('Announcement polling failed',error)}
 },30000);
