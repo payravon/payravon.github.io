@@ -97,6 +97,37 @@ function openDashboard(){
  $('statCount').textContent=String(data.lessons.length);renderTabs(activeTab);
 }
 function studentPoints(id){return data.points.filter(p=>p.student_id===id).reduce((sum,p)=>sum+Number(p.points||0),0)}
+
+function rankedStudents(){
+ return data.students.filter(s=>s.role==='student'&&s.status==='approved')
+  .sort((a,b)=>studentPoints(b.id)-studentPoints(a.id)||String(a.full_name||'').localeCompare(String(b.full_name||''),'tg')||String(a.id).localeCompare(String(b.id)));
+}
+function studentRank(id){if(!isStaff())return null;const index=rankedStudents().findIndex(s=>s.id===id);return index<0?null:index+1}
+function rankTheme(rank){return !rank?'rank-unranked':rank<=120?'rank-green':rank<=150?'rank-yellow':'rank-red'}
+function rankBadge(rank){if(!rank)return '<span class="rank-badge rank-unranked">—</span>';
+ const medal=rank===1?'🏆':rank===2?'🥇':rank===3?'🥈':rank===4?'🥉':'';
+ return `<span class="rank-badge ${rankTheme(rank)}">${medal?medal+' ':''}№${rank}${rank===1?' · Шоҳҷоиза':''}</span>`;
+}
+function studentNameHtml(id,fallback='—'){
+ const person=data.students.find(s=>s.id===id);
+ const rank=studentRank(id);
+ return `<span class="student-name ${rankTheme(rank)}">${esc(person?.full_name||fallback)}</span>`;
+}
+function secondsLeft(value){return Math.max(0,Math.floor((new Date(value).getTime()-Date.now())/1000))}
+function renderCountdown(seconds){
+ const days=Math.floor(seconds/86400),hours=Math.floor((seconds%86400)/3600),mins=Math.floor((seconds%3600)/60),secs=seconds%60;
+ return seconds===0?'Вақт фаро расид':`${days} рӯз · ${String(hours).padStart(2,'0')} соат · ${String(mins).padStart(2,'0')} дақ · ${String(secs).padStart(2,'0')} сония`;
+}
+function renderUrgentBanner(){
+ const container=$('urgentBanner');if(!container||!current)return;
+ const now=Date.now();
+ const featured=data.announcements.filter(a=>a.is_active!==false&&a.is_urgent&&a.is_pinned&&(!a.countdown_to||new Date(a.countdown_to).getTime()>now))
+  .sort((a,b)=>Number(b.id)-Number(a.id))[0];
+ if(!featured){container.innerHTML='';container.hidden=true;return}
+ container.hidden=false;
+ container.innerHTML=`<div class="urgent-banner"><div class="urgent-head">🔥 ХАБАРИ ФАВРӢ · РӮЗҲОИ НАЗДИК</div><strong class="urgent-title">${esc(featured.title)}</strong><p>${esc(featured.body)}</p>${featured.bonus_points?`<span class="urgent-bonus">⭐ ${Number(featured.bonus_points)} хол барои иштирок</span>`:''}${featured.countdown_to?`<div class="urgent-clock" data-end="${esc(featured.countdown_to)}" aria-live="off">⏳ ${renderCountdown(secondsLeft(featured.countdown_to))}</div>`:''}<span class="urgent-date">${featured.countdown_to?'Санаи чорабинӣ: '+dateTime(featured.countdown_to):'Эълони муҳим'}</span></div>`;
+}
+
 function renderTabs(tab='home'){
  if(!current)return;activeTab=tab;
  const studentTabs=[['home','Асосӣ'],['my','Саҳифаи ман'],['lessons','Дарсҳо'],['scan','Скан кардани QR'],['attendance','Иштироки ман'],['announcements','Эълонҳо'],['account','Логин ва парол']];
@@ -107,6 +138,7 @@ function renderTabs(tab='home'){
  $('nav').innerHTML=tabs.map(([k,n])=>`<button class="tab ${k===tab?'active':''}" data-tab="${k}">${esc(n)}</button>`).join('');
  $('nav').querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>renderTabs(b.dataset.tab)));
  const pages={home,my:myPage,students,lessons,qr:qrPanel,scan:scanPanel,attendance,announcements,reports,points:pointsPage,settings,account:accountSettings};
+ renderUrgentBanner();
  pages[tab]?.();
 }
 function panel(html){$('panel').innerHTML=html}
@@ -121,8 +153,8 @@ function attachStudentButtons(){
 function students(){
  if(!isStaff())return;
  const pending=data.students.filter(s=>s.role==='student'&&s.status==='pending');
- const approved=data.students.filter(s=>s.role==='student'&&s.status==='approved');
- const studentRows=(list,kind)=>list.length?`<div class="table-wrap"><table><thead><tr><th>Ному насаб</th><th>Телефон</th><th>Донишгоҳ</th><th>Курс</th><th>Хол</th><th>Амалиёт</th></tr></thead><tbody>${list.map(s=>`<tr><td>${esc(s.full_name)}</td><td>${esc(s.phone)}</td><td>${esc(universityName(s.university_id))}</td><td>${esc(s.course)}</td><td>${studentPoints(s.id)}</td><td>${kind==='pending'?`<button class="btn primary" data-act="approve" data-id="${esc(s.id)}">Тасдиқ</button> <button class="btn danger" data-act="reject" data-id="${esc(s.id)}">Рад</button>`:`<button class="btn danger" data-act="remove" data-id="${esc(s.id)}">Нест кардан</button>`}</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">Маълумот нест.</div>';
+ const approved=rankedStudents();
+ const studentRows=(list,kind)=>list.length?`<div class="table-wrap"><table><thead><tr><th>Ҷой</th><th>Ному насаб</th><th>Телефон</th><th>Донишгоҳ</th><th>Курс</th><th>Хол</th><th>Амалиёт</th></tr></thead><tbody>${list.map(s=>`<tr class="student-row ${rankTheme(studentRank(s.id))}"><td>${rankBadge(studentRank(s.id))}</td><td>${studentNameHtml(s.id,s.full_name)}</td><td>${esc(s.phone)}</td><td>${esc(universityName(s.university_id))}</td><td>${esc(s.course)}</td><td>${studentPoints(s.id)}</td><td>${kind==='pending'?`<button class="btn primary" data-act="approve" data-id="${esc(s.id)}">Тасдиқ</button> <button class="btn danger" data-act="reject" data-id="${esc(s.id)}">Рад</button>`:`<button class="btn danger" data-act="remove" data-id="${esc(s.id)}">Нест кардан</button>`}</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">Маълумот нест.</div>';
  panel(`<div class="panel-card"><h3>Огоҳӣ: ду дарси пайдарпай ғоиб</h3>${data.warnings.length?data.warnings.map(w=>`<div class="mini-card"><b style="font-size:17px">${esc(w.full_name)}</b><p>Дарсҳои ${w.lesson_a} ва ${w.lesson_b}: иштирок сабт нашудааст.</p><button class="btn danger" data-act="exclude" data-id="${esc(w.student_id)}">Бо тасдиқ хориҷ кардан</button></div>`).join(''):'<p class="muted">Огоҳӣ нест.</p>'}</div><div class="panel-card"><div class="panel-title"><h3>Дархостҳои бақайдгирӣ</h3><span class="status">${pending.length} интизор</span></div>${studentRows(pending,'pending')}</div><div class="panel-card"><h3>Донишҷӯёни тасдиқшуда</h3>${studentRows(approved,'approved')}</div><div class="notice">«Нест кардан» ҳисоби донишҷӯро ғайрифаъол ва аз рӯйхати фаъол хориҷ мекунад. Таърихи иштирок барои ҳисобот нигоҳ дошта мешавад.</div>`);
  attachStudentButtons();
 }
@@ -191,15 +223,31 @@ function scanPanel(){
 }
 function attendance(){
  const rows=data.attendance;
- panel(`<div class="panel-card"><div class="panel-title"><h3>${isStaff()?'Иштироки донишҷӯён':'Таърихи иштироки ман'}</h3><span class="status ok">${rows.length} сабт</span></div>${rows.length?`<div class="table-wrap"><table><thead><tr><th>Донишҷӯ</th><th>Дарс</th><th>Сана ва вақт</th></tr></thead><tbody>${rows.map(a=>`<tr><td>${esc(data.students.find(s=>s.id===a.student_id)?.full_name||current?.full_name||'—')}</td><td>${a.lesson_id} — ${esc(lessonName(a.lesson_id))}</td><td>${dateTime(a.attended_at)}</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">Ҳоло сабти иштирок нест.</div>'}</div>`);
+ panel(`<div class="panel-card"><div class="panel-title"><h3>${isStaff()?'Иштироки донишҷӯён':'Таърихи иштироки ман'}</h3><span class="status ok">${rows.length} сабт</span></div>${rows.length?`<div class="table-wrap"><table><thead><tr><th>Ҷой</th><th>Донишҷӯ</th><th>Дарс</th><th>Сана ва вақт</th></tr></thead><tbody>${rows.map(a=>`<tr class="student-row ${rankTheme(studentRank(a.student_id))}"><td>${rankBadge(studentRank(a.student_id))}</td><td>${studentNameHtml(a.student_id,current?.full_name||'—')}</td><td>${a.lesson_id} — ${esc(lessonName(a.lesson_id))}</td><td>${dateTime(a.attended_at)}</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">Ҳоло сабти иштирок нест.</div>'}</div>`);
 }
 function announcements(){
  const staff=isStaff();
- panel(`${staff?`<div class="panel-card"><h3>Нашри эълон</h3><form id="announceForm" class="form-grid"><label class="full">Сарлавҳа<input name="title" minlength="2" maxlength="200" required></label><label class="full">Матни эълон<textarea name="body" rows="3" minlength="2" maxlength="5000" required></textarea></label><label>Аудитория<select name="audience"><option value="">Ҳама</option>${data.universities.map(u=>`<option value="${u.id}">${esc(u.name)}</option>`).join('')}</select></label><button class="btn primary">Нашр кардан</button></form></div>`:''}<div class="panel-card"><h3>Эълонҳо</h3>${data.announcements.length?data.announcements.map(a=>`<div class="mini-card"><strong>${esc(a.title)}</strong><p>${esc(a.body)}</p><small>${esc(a.audience_university_id?universityName(a.audience_university_id):'Ҳама')} · ${dateTime(a.created_at)}</small></div>`).join(''):'<div class="empty">Эълон нест.</div>'}</div>`);
- if(staff)$('announceForm').onsubmit=async e=>{
-  e.preventDefault();const f=new FormData(e.target);
-  try{updateBusy(e.target,true);const {error}=await client.from('announcements').insert({title:f.get('title'),body:f.get('body'),audience_university_id:f.get('audience')?Number(f.get('audience')):null,created_by:current.id});if(error)throw error;await refresh('announcements');toast('Эълон нашр шуд.')}catch(ex){fail(ex)}finally{updateBusy(e.target,false)}
- };
+ const list=data.announcements.slice();
+ const announceRows=list.map(a=>`<div class="mini-card announcement-card ${a.is_urgent?'announcement-important':''}"><div class="announcement-title"><strong>${a.is_urgent?'🔥 ':''}${esc(a.title)}</strong>${a.is_pinned&&a.is_active!==false?'<span class="status ok">📌 Мустаҳкам</span>':''}${a.is_active===false?'<span class="status no">Хомӯш</span>':''}</div><p>${esc(a.body)}</p>${a.bonus_points?`<p>⭐ ${Number(a.bonus_points)} хол (эълон, на холи автоматӣ)</p>`:''}${a.countdown_to?`<p class="muted">⏳ ${dateTime(a.countdown_to)}</p>`:''}<small>${esc(a.audience_university_id?universityName(a.audience_university_id):'Ҳама')} · ${dateTime(a.created_at)}</small>${staff&&a.is_urgent?`<div class="announcement-actions"><button class="btn secondary" data-ann-action="pin" data-ann-id="${Number(a.id)}">${a.is_pinned?'Кушодани закреп':'Закрепить'}</button><button class="btn danger" data-ann-action="toggle" data-ann-id="${Number(a.id)}">${a.is_active===false?'Фаъол кардан':'Хомӯш кардан'}</button></div>`:''}</div>`).join('');
+ panel(`${staff?`<div class="panel-card"><h3>📢 Нашри эълон / хабари фаврӣ</h3><form id="announceForm" class="form-grid"><label class="full">Сарлавҳа<input name="title" minlength="2" maxlength="200" required placeholder="Масалан: РӮЗҲОИ НАЗДИК — ШАНБЕГӢ"></label><label class="full">Матни эълон<textarea name="body" rows="3" minlength="2" maxlength="5000" required></textarea></label><label>Аудитория<select name="audience"><option value="">Ҳама</option>${data.universities.map(u=>`<option value="${u.id}">${esc(u.name)}</option>`).join('')}</select></label><label>Сана ва вақти чорабинӣ<input type="datetime-local" name="countdown_to"></label><label>Хол барои чорабинӣ (ихтиёрӣ)<input type="number" name="bonus_points" min="0" max="100" value="0"></label><label class="check-label"><input type="checkbox" name="is_urgent" id="urgentCheck"> 🔥 Хабари фаврӣ</label><label class="check-label"><input type="checkbox" name="is_pinned" id="pinCheck"> 📌 Дар болои ҳама панелҳо нишон додан</label><button class="btn primary full">Нашр кардан</button></form><p class="hint">Барои ҳисобкунаки вақт, сана ва соатро муайян кунед. Холи эълон худкор дода намешавад; барои додани хол аз бахши «Холҳо» истифода баред.</p></div>`:''}<div class="panel-card"><h3>Эълонҳо</h3>${list.length?announceRows:'<div class="empty">Эълон нест.</div>'}</div>`);
+ if(staff){
+  $('pinCheck').onchange=e=>{if(e.target.checked)$('urgentCheck').checked=true};
+  $('announceForm').onsubmit=async e=>{
+   e.preventDefault();const f=new FormData(e.target),when=String(f.get('countdown_to')||'');
+   const urgent=f.has('is_urgent')||f.has('is_pinned');
+   if(urgent&&(!when||!Number.isFinite(new Date(when).getTime())||new Date(when).getTime()<=Date.now())){toast('Барои хабари фаврӣ сана ва вақти ояндаро интихоб кунед.');return}
+   const points=Number(f.get('bonus_points')||0);
+   if(!Number.isInteger(points)||points<0||points>100){toast('Хол аз 0 то 100 бошад.');return}
+   const payload={title:String(f.get('title')).trim(),body:String(f.get('body')).trim(),audience_university_id:f.get('audience')?Number(f.get('audience')):null,created_by:current.id,is_urgent:urgent,is_pinned:f.has('is_pinned'),countdown_to:when?new Date(when).toISOString():null,bonus_points:points,is_active:true};
+   try{updateBusy(e.target,true);const {error}=await client.from('announcements').insert(payload);if(error)throw error;await refresh('announcements');toast('Эълон нашр шуд.')}catch(ex){fail(ex)}finally{updateBusy(e.target,false)}
+  };
+  $('panel').querySelectorAll('[data-ann-action]').forEach(btn=>btn.onclick=async()=>{
+   const id=Number(btn.dataset.annId),item=data.announcements.find(a=>Number(a.id)===id);if(!item)return;
+   const patch=btn.dataset.annAction==='pin'?{is_pinned:!item.is_pinned,is_urgent:true}:{is_active:item.is_active===false};
+   if(patch.is_pinned&&item.countdown_to&&secondsLeft(item.countdown_to)===0){toast('Муҳлати ин эълон гузашт. Эълони нав созед.');return}
+   try{btn.disabled=true;const {error}=await client.from('announcements').update(patch).eq('id',id);if(error)throw error;await refresh('announcements');toast('Эълон нав шуд.')}catch(ex){fail(ex);btn.disabled=false}
+  });
+ }
 }
 function getReport(){
  const completed=data.lessons.filter(l=>l.status==='completed'&&l.completed_at);
@@ -208,15 +256,15 @@ function getReport(){
   const attended=eligible.filter(l=>data.attendance.some(a=>a.student_id===s.id&&a.lesson_id===l.id)).length;
   const scans=data.attendance.filter(a=>a.student_id===s.id).length;
   const absent=eligible.length-attended;
-  return {name:s.full_name,university:universityName(s.university_id),course:s.course,present:scans,absent,total:eligible.length,percent:eligible.length?(attended/eligible.length*100).toFixed(1):'—',points:studentPoints(s.id)};
+  return {id:s.id,name:s.full_name,university:universityName(s.university_id),course:s.course,present:scans,absent,total:eligible.length,percent:eligible.length?(attended/eligible.length*100).toFixed(1):'—',points:studentPoints(s.id)};
  });
 }
 function reports(){
  if(!isStaff())return;
- const rows=getReport();
- panel(`<div class="panel-card"><div class="panel-title"><h3>Ҳисоботи курс</h3><button class="btn primary" id="csv">Содироти CSV</button></div><p class="muted">Ҳозир — ҳар QR-и бомуваффақият сабтшуда (ҳатто дарси фаъол). Ғоибӣ ва фоиз танҳо аз дарсҳои анҷомёфтаи баъди тасдиқ ҳисоб мешаванд. Ҳангоми кушода будани ҳисобот, маълумот ҳар 10 сония нав мешавад.</p>${rows.length?`<div class="table-wrap"><table><thead><tr><th>Донишҷӯ</th><th>Донишгоҳ</th><th>Курс</th><th>Дарсҳои ҳисобшаванда</th><th>Ҳозир (QR)</th><th>Ғоиб</th><th>Иштирок</th><th>Хол</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${esc(r.name)}</td><td>${esc(r.university)}</td><td>${esc(r.course)}</td><td>${r.total}</td><td>${r.present}</td><td>${r.absent}</td><td>${r.percent==='—'?'—':r.percent+'%'}</td><td>${r.points}</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">Маълумоти кофӣ нест.</div>'}</div>`);
+ const rows=getReport().sort((a,b)=>studentPoints(b.id)-studentPoints(a.id)||String(a.name).localeCompare(String(b.name),'tg'));
+ panel(`<div class="panel-card"><div class="panel-title"><h3>Ҳисоботи курс</h3><button class="btn primary" id="csv">Содироти CSV</button></div><p class="muted">Ҳозир — ҳар QR-и бомуваффақият сабтшуда (ҳатто дарси фаъол). Ғоибӣ ва фоиз танҳо аз дарсҳои анҷомёфтаи баъди тасдиқ ҳисоб мешаванд. Ҳангоми кушода будани ҳисобот, маълумот ҳар 10 сония нав мешавад.</p>${rows.length?`<div class="table-wrap"><table><thead><tr><th>Ҷой</th><th>Донишҷӯ</th><th>Донишгоҳ</th><th>Курс</th><th>Дарсҳои ҳисобшаванда</th><th>Ҳозир (QR)</th><th>Ғоиб</th><th>Иштирок</th><th>Хол</th></tr></thead><tbody>${rows.map(r=>`<tr class="student-row ${rankTheme(studentRank(r.id))}"><td>${rankBadge(studentRank(r.id))}</td><td>${studentNameHtml(r.id,r.name)}</td><td>${esc(r.university)}</td><td>${esc(r.course)}</td><td>${r.total}</td><td>${r.present}</td><td>${r.absent}</td><td>${r.percent==='—'?'—':r.percent+'%'}</td><td>${r.points}</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">Маълумоти кофӣ нест.</div>'}</div>`);
  $('csv').onclick=()=>{
-  const cells=[['Ному насаб','Донишгоҳ','Курс','Дарсҳои ҳисобшаванда','Ҳозир','Ғоиб','Фоизи иштирок','Хол'],...rows.map(r=>[r.name,r.university,r.course,r.total,r.present,r.absent,r.percent,r.points])];
+  const cells=[['Ҷой','Ному насаб','Донишгоҳ','Курс','Дарсҳои ҳисобшаванда','Ҳозир','Ғоиб','Фоизи иштирок','Хол'],...rows.map(r=>[studentRank(r.id),r.name,r.university,r.course,r.total,r.present,r.absent,r.percent,r.points])];
   const csv='\uFEFF'+cells.map(r=>r.map(v=>{let x=String(v??'');if(/^[=+@-]/.test(x))x="'"+x;return '"'+x.replaceAll('"','""')+'"';}).join(';')).join('\r\n');
   const link=document.createElement('a');link.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));link.download='hisoboti-payravon.csv';link.click();setTimeout(()=>URL.revokeObjectURL(link.href),1500);
  };
@@ -244,8 +292,8 @@ function settings(){
 }
 function pointsPage(){
  if(!isStaff())return;
- const students=data.students.filter(s=>s.role==='student'&&s.status==='approved');
- panel(`<div class="panel-card"><h3>Додани хол барои чорабинӣ ё ҷамъомад</h3><p class="muted">Ҳар QR-и нав барои як дарс худкор 3 хол медиҳад. Барои кори иловагӣ метавонед хол илова кунед; сабаб ва номи диҳанда сабт мешаванд.</p>${students.length?`<form id="pointsForm" class="form-grid"><label>Донишҷӯ<select name="student" required>${students.map(s=>`<option value="${esc(s.id)}">${esc(s.full_name)}</option>`).join('')}</select></label><label>Хол (1–100)<input type="number" name="points" min="1" max="100" value="3" required></label><label class="full">Сабаби додани хол<input name="reason" minlength="5" maxlength="300" required placeholder="Масалан: иштирок дар чорабинӣ"></label><button class="btn primary full">Хол илова кардан</button></form>`:'<p>Донишҷӯи тасдиқшуда нест.</p>'}</div><div class="panel-card"><h3>Ҷамъи холҳои донишҷӯён</h3><div class="table-wrap"><table><thead><tr><th>Донишҷӯ</th><th>Хол</th></tr></thead><tbody>${students.map(s=>`<tr><td>${esc(s.full_name)}</td><td>${studentPoints(s.id)}</td></tr>`).join('')}</tbody></table></div></div><div class="panel-card"><h3>Таърихи холҳо</h3><div class="table-wrap"><table><thead><tr><th>Донишҷӯ</th><th>Хол</th><th>Сабаб</th><th>Сана</th></tr></thead><tbody>${data.points.map(p=>`<tr><td>${esc(data.students.find(s=>s.id===p.student_id)?.full_name||'—')}</td><td>+${Number(p.points)}</td><td>${esc(p.reason)}</td><td>${dateTime(p.created_at)}</td></tr>`).join('')}</tbody></table></div></div>`);
+ const students=rankedStudents();
+ panel(`<div class="panel-card"><h3>Додани хол барои чорабинӣ ё ҷамъомад</h3><p class="muted">Ҳар QR-и нав барои як дарс худкор 3 хол медиҳад. Барои кори иловагӣ метавонед хол илова кунед; сабаб ва номи диҳанда сабт мешаванд.</p>${students.length?`<form id="pointsForm" class="form-grid"><label>Донишҷӯ<select name="student" required>${students.map(s=>`<option value="${esc(s.id)}">${esc(s.full_name)}</option>`).join('')}</select></label><label>Хол (1–100)<input type="number" name="points" min="1" max="100" value="3" required></label><label class="full">Сабаби додани хол<input name="reason" minlength="5" maxlength="300" required placeholder="Масалан: иштирок дар чорабинӣ"></label><button class="btn primary full">Хол илова кардан</button></form>`:'<p>Донишҷӯи тасдиқшуда нест.</p>'}</div><div class="panel-card"><h3>Ҷамъи холҳои донишҷӯён</h3><div class="table-wrap"><table><thead><tr><th>Ҷой</th><th>Донишҷӯ</th><th>Хол</th></tr></thead><tbody>${students.map(s=>`<tr class="student-row ${rankTheme(studentRank(s.id))}"><td>${rankBadge(studentRank(s.id))}</td><td>${studentNameHtml(s.id,s.full_name)}</td><td>${studentPoints(s.id)}</td></tr>`).join('')}</tbody></table></div></div><div class="panel-card"><h3>Таърихи холҳо</h3><div class="table-wrap"><table><thead><tr><th>Донишҷӯ</th><th>Хол</th><th>Сабаб</th><th>Сана</th></tr></thead><tbody>${data.points.map(p=>`<tr><td>${studentNameHtml(p.student_id)}</td><td>+${Number(p.points)}</td><td>${esc(p.reason)}</td><td>${dateTime(p.created_at)}</td></tr>`).join('')}</tbody></table></div></div>`);
  if(students.length)$('pointsForm').onsubmit=async e=>{
   e.preventDefault();const f=new FormData(e.target),v=Number(f.get('points'));
   if(!Number.isInteger(v)||v<1||v>100){toast('Хол аз 1 то 100 бошад.');return}
@@ -311,3 +359,14 @@ setInterval(async()=>{
  if(!client||!current||!isStaff()||activeTab!=='reports'||document.hidden||$('dashboard').classList.contains('hidden'))return;
  try{await loadData();if(activeTab==='reports')reports()}catch(error){console.warn('Report refresh failed',error)}
 },10000);
+
+// A lightweight countdown redraws text, without disrupting a user editing a form.
+setInterval(()=>{
+ const clock=$('urgentBanner')?.querySelector('[data-end]');
+ if(clock){const remaining=secondsLeft(clock.dataset.end);clock.textContent='⏳ '+renderCountdown(remaining);if(!remaining)renderUrgentBanner()}
+},1000);
+// Receive new pinned announcements from other logged-in accounts.
+setInterval(async()=>{
+ if(!client||!current||document.hidden||$('dashboard').classList.contains('hidden'))return;
+ try{const rows=await q('announcements',{order:'id',ascending:false});data.announcements=rows;renderUrgentBanner()}catch(error){console.warn('Announcement polling failed',error)}
+},30000);

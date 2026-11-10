@@ -12,3 +12,26 @@
  .bar-row{grid-template-columns:95px 1fr}.grid-cards{grid-template-columns:1fr 1fr}
 }
 @media(max-width:420px){.grid-cards{grid-template-columns:1fr}.role-pill{display:none}}
+
+
+/* Payravon: leaderboard tiers and distinctive student names */
+.student-row td{border-bottom:1px solid #cddbf0}
+.student-row.rank-green{background:#effaf2}.student-row.rank-yellow{background:#fff9e7}.student-row.rank-red{background:#fff0f1}
+.student-row:hover{filter:brightness(.985)}
+.student-name{display:inline-block;color:#174b9c;background:#edf4ff;border:1px solid #a6c4f2;border-left:4px solid #356dc8;padding:6px 10px;border-radius:8px;font-weight:700;white-space:normal;min-width:120px}
+.rank-badge{display:inline-block;font-size:12px;font-weight:800;border-radius:18px;padding:6px 10px;white-space:nowrap}
+.rank-badge.rank-green{background:#c9efd6;color:#126338}.rank-badge.rank-yellow{background:#fff0af;color:#805b00}.rank-badge.rank-red{background:#ffd5d9;color:#9c283b}.rank-badge.rank-unranked{background:#edf0f5;color:#57647a}
+.student-row.rank-green .student-name{border-color:#91cbb2}.student-row.rank-yellow .student-name{border-color:#edcd79}.student-row.rank-red .student-name{border-color:#e4acb3}
+.urgent-host{margin:0 0 16px}.urgent-host[hidden]{display:none!important}
+.urgent-banner{position:relative;overflow:hidden;padding:22px 26px;border:1px solid #f6ad38;border-radius:20px;color:#fff;background:linear-gradient(115deg,#a32124 0%,#d34713 50%,#ed9c17 100%);box-shadow:0 14px 34px #a64b2130}
+.urgent-banner:after{content:'✦';position:absolute;right:-16px;top:-48px;font-size:180px;opacity:.12;pointer-events:none}
+.urgent-head{font-size:12px;letter-spacing:1.4px;font-weight:900;margin-bottom:9px}
+.urgent-title{display:block;font-size:clamp(19px,3vw,28px);line-height:1.3;max-width:800px}
+.urgent-banner p{margin:10px 0;max-width:800px;color:#fff9eb;white-space:pre-wrap}
+.urgent-bonus{display:inline-block;border-radius:30px;background:#fff1b8;color:#7c3d07;padding:7px 13px;font-weight:800;margin:4px 12px 4px 0}
+.urgent-clock{display:inline-block;border:1px solid #ffffff80;border-radius:12px;padding:9px 14px;background:#521b1e45;font-size:clamp(13px,2.5vw,20px);font-variant-numeric:tabular-nums;font-weight:800;margin:6px 12px 6px 0}
+.urgent-date{display:block;font-size:12px;margin-top:7px;color:#ffedc7}
+.announcement-card{margin-top:12px}.announcement-important{border-left:5px solid #e17020;background:#fffaf1}
+.announcement-title{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.announcement-actions{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+.check-label{flex-direction:row;align-items:center;gap:9px;align-self:center}.check-label input{width:18px;height:18px;flex-shrink:0}
+@media(max-width:760px){.urgent-banner{padding:18px}.student-name{min-width:0}.rank-badge{white-space:normal}}
