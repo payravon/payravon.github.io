@@ -78,3 +78,15 @@ body.staff-layout.sidebar-collapsed #app{margin:24px auto}
 .student-summary-grid .mini-card:nth-child(3){background:#eaf3ff;border-color:#b8d6ff}
 .student-summary-grid .mini-card:nth-child(4){background:#f3edff;border-color:#d9c5ff}
 @media(max-width:760px){body.staff-layout #app,body #app{padding:0 12px;margin:16px auto}.student-summary-grid{gap:8px!important}.student-summary-grid .mini-card{padding:12px;min-height:80px}.student-summary-grid .mini-card b{font-size:22px}.topbar{padding:9px 14px!important}}
+
+/* v3.3: one off-canvas drawer for every role and screen width. */
+body #dashboard .menu-toggle{display:inline-flex!important;align-items:center;position:relative;z-index:6;margin:4px 0 14px;background:#eaf0fb;color:#102b65;}
+body #dashboard #nav{position:fixed!important;top:0!important;bottom:0!important;left:0!important;right:auto!important;width:min(310px,86vw)!important;height:100dvh!important;display:flex!important;flex-direction:column!important;align-items:stretch!important;justify-content:flex-start!important;flex-wrap:nowrap!important;gap:8px!important;padding:88px 16px 24px!important;margin:0!important;overflow-y:auto!important;background:#172b47!important;border:0!important;border-radius:0!important;box-shadow:6px 0 26px #0d1d3240!important;transform:translateX(-105%)!important;transition:transform .22s ease!important;pointer-events:none!important;z-index:32!important;}
+body.mobile-nav-open #dashboard #nav{transform:translateX(0)!important;pointer-events:auto!important;}
+body #dashboard #nav .tab{display:block!important;width:100%!important;text-align:left!important;padding:13px 15px!important;background:transparent!important;color:#fff!important;border:1px solid transparent!important;border-radius:9px!important;}
+body #dashboard #nav .tab.active{background:#2555bf!important;color:#fff!important;}
+body #dashboard .nav-backdrop{position:fixed!important;inset:0!important;background:#081a3380!important;z-index:31!important;display:none!important;}
+body.mobile-nav-open #dashboard .nav-backdrop{display:block!important;}
+body.mobile-nav-open{overflow:hidden;}
+body #dashboard .student-summary-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important;}
+@media(max-width:420px){body #dashboard .student-summary-grid .mini-card{padding:10px!important;min-height:74px!important}body #dashboard .student-summary-grid .mini-card small{font-size:12px}body #dashboard .student-summary-grid .mini-card b{font-size:22px}}
