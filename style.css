@@ -41,3 +41,19 @@
 .event-roster ol{margin:0;padding-inline-start:28px;line-height:1.8}
 #eventPointsOutput{margin-top:16px}
 #eventPointsCode img,#eventPointsCode canvas{max-width:100%;height:auto}
+/* Payravon v3: ASU-inspired staff shell; student layout stays familiar */
+@media(min-width:850px){
+ body.staff-layout .topbar{background:#17283d;color:white;width:276px;height:94px;position:fixed;left:0;top:0;z-index:30;border:0;box-shadow:none;padding:12px 18px}
+ body.staff-layout .topbar .brand{color:white}body.staff-layout .topbar .brand b{font-size:16px}body.staff-layout .topbar .brand small{color:#d4e0f2}body.staff-layout .topbar .brand img{width:64px;height:64px;object-fit:contain}
+ body.staff-layout .top-actions{position:fixed;top:16px;right:28px;color:#143d91}body.staff-layout #app{margin-left:276px;max-width:none;padding:28px 26px}
+ body.staff-layout #dashboard{min-height:80vh}body.staff-layout #nav{position:fixed;top:94px;bottom:0;left:0;width:276px;z-index:25;display:flex;flex-direction:column;gap:2px;background:#1d3047;padding:20px 0;overflow-y:auto;border-radius:0;box-shadow:none}
+ body.staff-layout #nav .tab{border:0;border-radius:0;background:transparent;color:#f2f6fd;text-align:left;padding:15px 24px;font-size:15px;width:100%}
+ body.staff-layout #nav .tab.active{background:#2858cf;color:white}body.staff-layout #nav .tab:hover{background:#345078}
+ body.staff-layout .dash-head{padding:14px 0}body.staff-layout .panel-card{background:#fff}
+}
+.listeners-table{background:white}.listeners-table tr{background:white!important}.listeners-table td{padding:14px 18px}.listeners-table .student-name{background:#f6f9ff;border-left-color:#2e68bd}
+.report-select{cursor:pointer}.report-select:focus-visible{outline:3px solid #3979ef;outline-offset:-3px}
+.profile-overlay{position:fixed;inset:0;background:#13233c88;z-index:100;display:flex;align-items:center;justify-content:center;padding:20px}
+.profile-sheet{width:min(900px,100%);max-height:92vh;overflow:auto;background:white;border-radius:18px;padding:28px;box-shadow:0 20px 65px #14294c55;color:#1a2b46}
+.profile-close{float:right}.profile-facts{display:grid;grid-template-columns:1fr 1fr;gap:20px;padding:20px;background:#f6f9ff;border-radius:12px}.profile-metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:20px 0}.profile-metrics>div{background:#eef4ff;border-radius:12px;padding:16px}.profile-metrics small{display:block}.profile-metrics b{font-size:28px}
+@media(max-width:650px){.profile-facts{grid-template-columns:1fr}.profile-sheet{padding:16px}.profile-metrics>div{padding:10px}}
