@@ -620,3 +620,14 @@ setInterval(async()=>{
   )));
  }catch(error){console.warn('Announcement polling failed',error)}
 },30000);
+
+// Staff-only desktop sidebar toggle. No changes to authentication or Supabase requests.
+const desktopMenuToggle = document.getElementById('desktopMenuToggle');
+if (desktopMenuToggle) {
+ desktopMenuToggle.addEventListener('click', () => {
+   const collapsed = document.body.classList.toggle('sidebar-collapsed');
+   desktopMenuToggle.setAttribute('aria-expanded', String(!collapsed));
+   desktopMenuToggle.setAttribute('aria-label', collapsed ? 'Кушодани меню' : 'Пӯшидани меню');
+   desktopMenuToggle.title = collapsed ? 'Кушодани меню' : 'Пӯшидани меню';
+ });
+}

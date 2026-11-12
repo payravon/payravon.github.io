@@ -3,12 +3,12 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#102b65"><title>Пайравони Пешвои миллат</title>
-<link rel="stylesheet" href="style.css?v=20261110-2">
+<link rel="stylesheet" href="style.css?v=20261112-4">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" defer></script>
 <script src="https://unpkg.com/html5-qrcode" defer></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" defer></script>
 <script src="config.js?v=20261108-1" defer></script>
-<script src="app.js?v=20261110-3" defer></script>
+<script src="app.js?v=20261112-4" defer></script>
 </head>
 <body>
 <header class="topbar"><div class="brand"><img src="assets/logo.png" alt="Логотип"><div><b>Пайравони Пешвои миллат</b><small>Платформаи идоракунии курс</small></div></div><div class="top-actions"><span id="roleLabel" class="role-pill">Кушодани система</span><button class="btn ghost" id="logoutBtn" hidden>Баромадан</button></div></header>
@@ -18,7 +18,7 @@
 <section id="register" class="card form-card hidden"><div class="section-head"><div><span class="eyebrow">ҲИСОБИ НАВ</span><h2>Бақайдгирии донишҷӯ</h2></div><button class="btn ghost" data-view="welcome">Бозгашт</button></div><form id="registerForm" class="form-grid"><label>Ному насаб<input name="name" required maxlength="200" placeholder="Ному насаби пурра"></label><label>Рақами телефон<input name="phone" required maxlength="30" placeholder="+992..."></label><label>Почтаи электронӣ (барои воридшавӣ)<input name="email" type="email" autocomplete="email" required placeholder="name@example.com"></label><label>Донишгоҳ<select name="university" id="regUniversity" required></select></label><label>Курс<select name="course" required><option value="">Интихоб кунед</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option></select></label><label>Парол<input name="password" type="password" minlength="8" autocomplete="new-password" required placeholder="Ҳадди ақал 8 аломат"></label><button class="btn primary full" type="submit">Фиристодани дархост</button></form><p class="hint">Эҳтимол тасдиқи email талаб шавад. Баъди тасдиқи Admin воридшавӣ фаъол мегардад.</p></section>
 <section id="login" class="card form-card hidden"><div class="section-head"><div><span class="eyebrow">КАБИНЕТИ ШАХСӢ</span><h2>Воридшавӣ</h2></div><button class="btn ghost" data-view="welcome">Бозгашт</button></div><form id="loginForm" class="form-grid one"><label>Email<input name="identity" type="email" autocomplete="email" required></label><label>Парол<input name="password" type="password" autocomplete="current-password" required></label><button class="btn primary full">Ворид шудан</button></form><p class="hint">Логинҳои демо нестанд. Email ва парол дар Supabase Auth нигоҳдорӣ мешаванд.</p></section>
 <section id="hold" class="card form-card hidden"><h2 id="holdTitle">Дархост дар интизорӣ</h2><p id="holdText"></p><button class="btn secondary" id="holdLogout">Баромадан</button></section>
-<section id="dashboard" class="hidden"><div class="dash-head"><div><span class="eyebrow" id="dashRole">КАБИНЕТ</span><h1 id="dashTitle">Асосӣ</h1><p id="dashSubtitle" class="muted"></p></div><div class="dash-stat"><b id="statCount">30</b><small>Дарси умумӣ</small></div></div><div id="urgentBanner" class="urgent-host" hidden></div><button id="menuToggle" class="btn secondary menu-toggle" aria-expanded="false" aria-controls="nav" aria-label="Кушодани меню">☰ Меню</button><div id="navBackdrop" class="nav-backdrop"></div><nav id="nav" class="tabs"></nav><div id="panel"></div></section>
+<section id="dashboard" class="hidden"><button id="desktopMenuToggle" class="desktop-menu-toggle" type="button" aria-label="Пӯшидани меню" aria-controls="nav" aria-expanded="true" title="Кушодан ё пӯшидани меню">☰</button><div class="dash-head"><div><span class="eyebrow" id="dashRole">КАБИНЕТ</span><h1 id="dashTitle">Асосӣ</h1><p id="dashSubtitle" class="muted"></p></div><div class="dash-stat"><b id="statCount">30</b><small>Дарси умумӣ</small></div></div><div id="urgentBanner" class="urgent-host" hidden></div><button id="menuToggle" class="btn secondary menu-toggle" aria-expanded="false" aria-controls="nav" aria-label="Кушодани меню">☰ Меню</button><div id="navBackdrop" class="nav-backdrop"></div><nav id="nav" class="tabs"></nav><div id="panel"></div></section>
 </main><footer>© Пайравони Пешвои миллат · Платформаи идоракунии курс</footer>
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
 </body></html>
