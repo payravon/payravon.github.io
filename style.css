@@ -90,3 +90,9 @@ body.mobile-nav-open #dashboard .nav-backdrop{display:block!important;}
 body.mobile-nav-open{overflow:hidden;}
 body #dashboard .student-summary-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important;}
 @media(max-width:420px){body #dashboard .student-summary-grid .mini-card{padding:10px!important;min-height:74px!important}body #dashboard .student-summary-grid .mini-card small{font-size:12px}body #dashboard .student-summary-grid .mini-card b{font-size:22px}}
+
+/* v3.4: large distance-readable QR; fluid on mobile */
+#qrcode,#eventPointsCode{display:flex;justify-content:center;align-items:center;max-width:100%;padding:14px;background:#fff;border-radius:12px}
+#qrcode img,#qrcode canvas,#eventPointsCode img,#eventPointsCode canvas{width:min(420px,100%)!important;height:auto!important;aspect-ratio:1/1;image-rendering:auto}
+.qr-box{min-height:480px;padding:16px;background:#fff}
+@media(max-width:760px){.qr-box{min-height:unset}.qr-layout{grid-template-columns:minmax(0,1fr)}}

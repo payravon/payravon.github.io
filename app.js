@@ -223,13 +223,13 @@ function lessons(){
 }
 function qrPanel(){
  if(!isStaff())return;
- panel(`<div class="panel-card"><h3>QR-коди дарс</h3><div class="qr-layout"><div class="qr-info"><label>Интихоби дарс<select id="qrLesson">${data.lessons.map(l=>`<option value="${l.id}">${l.id} — ${esc(l.title)} ${l.status==='completed'?'(Анҷом ёфтааст)':''}</option>`).join('')}</select></label><p class="notice">QR-код дар сервер сохта шуда, 10 дақиқа эътибор дорад. Дар сурати гузаштани вақт QR-и нав созед.</p><button class="btn primary" id="makeQR">Сохтани QR-код</button><button class="btn danger" id="stopQR">Анҷом додани дарс</button><div id="qrMeta" class="muted">Ҳоло QR сохта нашудааст.</div></div><div class="qr-box"><div id="qrcode"></div><div id="qrPlaceholder" class="qr-placeholder">QR-код дар ин ҷо намоиш дода мешавад.</div></div></div></div>`);
+ panel(`<div class="panel-card"><h3>QR-коди дарс</h3><div class="qr-layout"><div class="qr-info"><label>Интихоби дарс<select id="qrLesson">${data.lessons.map(l=>`<option value="${l.id}">${l.id} — ${esc(l.title)} ${l.status==='completed'?'(Анҷом ёфтааст)':''}</option>`).join('')}</select></label><p class="notice">QR-код 20 дақиқа эътибор дорад. Барои донишҷӯёне, ки хол нагирифтанд, QR-ро дубора кушоед. Барои ҳар дарс хол танҳо як маротиба бояд сабт шавад.</p><button class="btn primary" id="makeQR">Сохтан / дубора кушодани QR</button><button class="btn danger" id="stopQR">Анҷом додани дарс</button><div id="qrMeta" class="muted">Ҳоло QR сохта нашудааст.</div></div><div class="qr-box"><div id="qrcode"></div><div id="qrPlaceholder" class="qr-placeholder">QR-код дар ин ҷо намоиш дода мешавад.</div></div></div></div>`);
  $('makeQR').onclick=async()=>{
   try{const id=Number($('qrLesson').value);const {data:qr,error}=await client.rpc('start_lesson_qr',{p_lesson:id});if(error)throw error;
    if(typeof QRCode==='undefined')throw Error('Китобхонаи QR бор нашуд. Интернетро санҷед.');
    $('qrcode').innerHTML='';$('qrPlaceholder').hidden=true;
-   new QRCode($('qrcode'),{text:JSON.stringify({lesson:qr.lesson,token:qr.token}),width:240,height:240,correctLevel:QRCode.CorrectLevel.M});
-   $('qrMeta').textContent=`Дарси ${id} · Эътибор то: ${dateTime(qr.expires_at)}`;toast('QR-и 10-дақиқаина сохта шуд.');
+   new QRCode($('qrcode'),{text:JSON.stringify({lesson:qr.lesson,token:qr.token}),width:420,height:420,correctLevel:QRCode.CorrectLevel.H});
+   $('qrMeta').textContent=`Дарси ${id} · Эътибор то: ${dateTime(qr.expires_at)}`;toast('QR-и 20-дақиқаина сохта шуд.');
   }catch(e){fail(e)}
  };
  $('stopQR').onclick=async()=>{
@@ -240,14 +240,14 @@ function qrPanel(){
 }
 function scanPanel(){
  if(role()!=='student')return;
- panel(`<div class="panel-card scan-area"><h3>Скан кардани QR-коди дарс ё чорабинӣ</h3><p class="muted">Барои камера HTTPS ё localhost лозим аст. QR танҳо 10 дақиқа кор мекунад.</p><div id="reader"></div><div id="scanResult" class="notice">QR ҳоло скан нашудааст.</div><button class="btn secondary" id="startScan">Оғози скан</button> <button class="btn ghost" id="stopScan">Қатъи камера</button></div>`);
+ panel(`<div class="panel-card scan-area"><h3>Скан кардани QR-коди дарс ё чорабинӣ</h3><p class="muted">Барои камера HTTPS ё localhost лозим аст. QR танҳо 20 дақиқа кор мекунад.</p><div id="reader"></div><div id="scanResult" class="notice">QR ҳоло скан нашудааст.</div><button class="btn secondary" id="startScan">Оғози скан</button> <button class="btn ghost" id="stopScan">Қатъи камера</button></div>`);
  let scanner=null,handling=false;
  $('startScan').onclick=async()=>{
   if(scanner)return;
   if(typeof Html5Qrcode==='undefined'){toast('Китобхонаи сканер бор нашуд.');return}
   try{
    scanner=new Html5Qrcode('reader');
-   await scanner.start({facingMode:'environment'},{fps:8,qrbox:220},async decoded=>{
+   await scanner.start({facingMode:'environment'},{fps:8,qrbox:260},async decoded=>{
     if(handling)return;handling=true;
     try{
      const qr=JSON.parse(decoded);
@@ -459,7 +459,7 @@ function eventPointsPanel(){
    <label class="full" id="eventReasonLabel">Номи чорабинӣ<input name="reason" minlength="2" maxlength="300" required></label>
    <button class="btn primary full">Сохтани QR-код</button>
   </form>
-  <p class="hint">QR-код 10 дақиқа эътибор дорад. Донишҷӯ онро аз бахши «Скан кардани QR» мехонад. Барои чорабинии бе эълон ба ҳама донишҷӯёни тасдиқшудае, ки QR-ро скан мекунанд, хол дода мешавад.</p>
+  <p class="hint">QR-код 20 дақиқа эътибор дорад. Донишҷӯ онро аз бахши «Скан кардани QR» мехонад. Барои чорабинии бе эълон ба ҳама донишҷӯёни тасдиқшудае, ки QR-ро скан мекунанд, хол дода мешавад.</p>
   <div id="eventPointsOutput" hidden><p id="eventPointsMeta" role="status"></p><div id="eventPointsCode"></div></div>
  </div>`;
 }
@@ -488,7 +488,7 @@ function bindEventPointsForm(){
    $('eventPointsCode').replaceChildren();
    new QRCode($('eventPointsCode'),{
     text:JSON.stringify({type:'event-points',token:qr.token}),
-    width:240,height:240,correctLevel:QRCode.CorrectLevel.M
+    width:420,height:420,correctLevel:QRCode.CorrectLevel.H
    });
    $('eventPointsMeta').textContent=`+${qr.points} хол · Эътибор то ${dateTime(qr.expires_at)}`;
    $('eventPointsOutput').hidden=false;
