@@ -41,16 +41,7 @@
 .event-roster ol{margin:0;padding-inline-start:28px;line-height:1.8}
 #eventPointsOutput{margin-top:16px}
 #eventPointsCode img,#eventPointsCode canvas{max-width:100%;height:auto}
-/* Payravon v3: ASU-inspired staff shell; student layout stays familiar */
-@media(min-width:850px){
- body.staff-layout .topbar{background:#17283d;color:white;width:276px;height:94px;position:fixed;left:0;top:0;z-index:30;border:0;box-shadow:none;padding:12px 18px}
- body.staff-layout .topbar .brand{color:white}body.staff-layout .topbar .brand b{font-size:16px}body.staff-layout .topbar .brand small{color:#d4e0f2}body.staff-layout .topbar .brand img{width:64px;height:64px;object-fit:contain}
- body.staff-layout .top-actions{position:fixed;top:16px;right:28px;color:#143d91}body.staff-layout #app{margin-left:276px;max-width:none;padding:28px 26px}
- body.staff-layout #dashboard{min-height:80vh}body.staff-layout #nav{position:fixed;top:94px;bottom:0;left:0;width:276px;z-index:25;display:flex;flex-direction:column;gap:2px;background:#1d3047;padding:20px 0;overflow-y:auto;border-radius:0;box-shadow:none}
- body.staff-layout #nav .tab{border:0;border-radius:0;background:transparent;color:#f2f6fd;text-align:left;padding:15px 24px;font-size:15px;width:100%}
- body.staff-layout #nav .tab.active{background:#2858cf;color:white}body.staff-layout #nav .tab:hover{background:#345078}
- body.staff-layout .dash-head{padding:14px 0}body.staff-layout .panel-card{background:#fff}
-}
+/* Shared dashboard layout for all roles */
 .listeners-table{background:white}.listeners-table tr{background:white!important}.listeners-table td{padding:14px 18px}.listeners-table .student-name{background:#f6f9ff;border-left-color:#2e68bd}
 .report-select{cursor:pointer}.report-select:focus-visible{outline:3px solid #3979ef;outline-offset:-3px}
 .profile-overlay{position:fixed;inset:0;background:#13233c88;z-index:100;display:flex;align-items:center;justify-content:center;padding:20px}
@@ -59,24 +50,31 @@
 @media(max-width:650px){.profile-facts{grid-template-columns:1fr}.profile-sheet{padding:16px}.profile-metrics>div{padding:10px}}
 
 
-/* v3.1: compact staff header, accessible collapsible navigation */
-.desktop-menu-toggle{display:none}
-@media(min-width:850px){
- body.staff-layout .desktop-menu-toggle{display:flex;align-items:center;justify-content:center;position:fixed;top:103px;left:285px;z-index:35;width:40px;height:40px;border:1px solid #d9e3f1;border-radius:10px;background:#fff;color:#16335d;font-size:23px;cursor:pointer;box-shadow:0 3px 12px #122b4b17;transition:left .2s ease}
- body.staff-layout .dash-head{min-height:100px;margin:0 0 16px;padding:16px 22px;box-shadow:none;gap:14px}
- body.staff-layout .dash-head h1{font-size:24px;margin:4px 0}
- body.staff-layout .dash-head p{margin:4px 0;font-size:12px;line-height:1.4}
- body.staff-layout .dash-stat{padding:9px 16px;min-width:100px}
- body.staff-layout .dash-stat b{font-size:22px}
- body.staff-layout .topbar .brand img{background:transparent;border-radius:50%;flex-shrink:0}
- body.staff-layout .topbar .brand b{color:#fff;line-height:1.25}
- body.staff-layout .topbar .brand{min-width:0;gap:9px}
- body.staff-layout .topbar .brand div{min-width:0}
- body.staff-layout .topbar .brand small{line-height:1.3}
- body.staff-layout.sidebar-collapsed #nav{transform:translateX(-100%);pointer-events:none}
- body.staff-layout.sidebar-collapsed .topbar{transform:translateX(-100%);pointer-events:none}
- body.staff-layout.sidebar-collapsed #app{margin-left:0}
- body.staff-layout.sidebar-collapsed .desktop-menu-toggle{left:12px}
- body.staff-layout #nav,body.staff-layout .topbar,body.staff-layout #app{transition:transform .2s ease,margin-left .2s ease}
-}
-@media(max-width:849px){.desktop-menu-toggle{display:none!important}}
+
+/* v3.2: identical presentation for Admin, Super Admin and students */
+body.staff-layout .topbar,body .topbar{position:sticky;top:0;left:auto;width:100%;height:82px;background:#fff;color:var(--ink);border-bottom:1px solid var(--line);padding:10px max(22px,calc((100% - 1180px)/2));transform:none;box-shadow:none}
+body.staff-layout .topbar .brand b{color:var(--navy)}
+body.staff-layout .topbar .brand small{color:var(--muted)}
+body.staff-layout .topbar .brand img{width:58px;height:58px}
+body.staff-layout .top-actions{position:static;color:var(--blue)}
+body.staff-layout #app,body #app{max-width:1180px;margin:24px auto;padding:0 20px}
+body.staff-layout #nav,body #nav{position:static;display:flex;flex-direction:row;flex-wrap:wrap;width:auto;inset:auto;gap:8px;background:transparent;padding:0;overflow:visible;border-radius:0;transform:none;pointer-events:auto}
+body.staff-layout #nav .tab,body #nav .tab{width:auto;border:1px solid var(--line);border-radius:10px;background:white;color:#526078;text-align:center;padding:10px 15px;font-size:14px}
+body.staff-layout #nav .tab.active,body #nav .tab.active{background:var(--navy);color:white;border-color:var(--navy)}
+body.staff-layout .dash-head,body .dash-head{padding:16px 22px;min-height:100px;margin-bottom:16px;box-shadow:none}
+body.staff-layout .dash-head h1{font-size:24px;margin:4px 0}
+body.staff-layout .dash-head p{margin:4px 0;font-size:12px}
+body.staff-layout .dash-stat{padding:9px 16px;min-width:100px}
+body.staff-layout .dash-stat b{font-size:22px}
+.desktop-menu-toggle{display:none!important}
+body.staff-layout.sidebar-collapsed #nav,body.staff-layout.sidebar-collapsed .topbar{transform:none;pointer-events:auto}
+body.staff-layout.sidebar-collapsed #app{margin:24px auto}
+/* Compact Windows-like 2 by 2 student statistics */
+.student-summary-grid{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:12px!important;margin-bottom:16px}
+.student-summary-grid .mini-card{min-width:0;min-height:88px;padding:14px 16px;border-radius:14px;display:flex;flex-direction:column;justify-content:center}
+.student-summary-grid .mini-card b{font-size:25px;margin-top:5px}
+.student-summary-grid .mini-card:nth-child(1){background:#eaf9ef;border-color:#b9e9c8}
+.student-summary-grid .mini-card:nth-child(2){background:#fff0f1;border-color:#f1c5cd}
+.student-summary-grid .mini-card:nth-child(3){background:#eaf3ff;border-color:#b8d6ff}
+.student-summary-grid .mini-card:nth-child(4){background:#f3edff;border-color:#d9c5ff}
+@media(max-width:760px){body.staff-layout #app,body #app{padding:0 12px;margin:16px auto}.student-summary-grid{gap:8px!important}.student-summary-grid .mini-card{padding:12px;min-height:80px}.student-summary-grid .mini-card b{font-size:22px}.topbar{padding:9px 14px!important}}
